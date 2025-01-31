@@ -1,0 +1,116 @@
+import { useState, useEffect } from 'react'
+import type { Workout, Exercise, Set } from '@/types/workout'
+
+const STORAGE_KEY = 'workout-tracker-workouts'
+
+export function useWorkouts() {
+  const [workouts, setWorkouts] = useState<Workout[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load workouts from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedWorkouts = localStorage.getItem(STORAGE_KEY)
+      if (savedWorkouts) {
+        setWorkouts(JSON.parse(savedWorkouts))
+      }
+    } catch (err) {
+      setError('Failed to load workouts from storage')
+      console.error('Error loading workouts:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Save workouts to localStorage whenever they change
+  useEffect(() => {
+    if (!loading) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(workouts))
+      } catch (err) {
+        setError('Failed to save workouts to storage')
+        console.error('Error saving workouts:', err)
+      }
+    }
+  }, [workouts, loading])
+
+  // Add a new workout
+  const addWorkout = (workout: Omit<Workout, 'id'>) => {
+    const newWorkout: Workout = {
+      ...workout,
+      id: crypto.randomUUID(),
+    }
+    setWorkouts((prev) => [...prev, newWorkout])
+    return newWorkout
+  }
+
+  // Update an existing workout
+  const updateWorkout = (id: string, updates: Partial<Workout>) => {
+    setWorkouts((prev) =>
+      prev.map((workout) =>
+        workout.id === id ? { ...workout, ...updates } : workout
+      )
+    )
+  }
+
+  // Delete a workout
+  const deleteWorkout = (id: string) => {
+    setWorkouts((prev) => prev.filter((workout) => workout.id !== id))
+  }
+
+  // Add an exercise to a workout
+  const addExercise = (workoutId: string, exercise: Omit<Exercise, 'id'>) => {
+    const newExercise: Exercise = {
+      ...exercise,
+      id: crypto.randomUUID(),
+    }
+    setWorkouts((prev) =>
+      prev.map((workout) =>
+        workout.id === workoutId
+          ? { ...workout, exercises: [...workout.exercises, newExercise] }
+          : workout
+      )
+    )
+    return newExercise
+  }
+
+  // Update a set's completion status
+  const updateSetCompletion = (
+    workoutId: string,
+    exerciseId: string,
+    setId: string,
+    completed: boolean
+  ) => {
+    setWorkouts((prev) =>
+      prev.map((workout) =>
+        workout.id === workoutId
+          ? {
+              ...workout,
+              exercises: workout.exercises.map((exercise) =>
+                exercise.id === exerciseId
+                  ? {
+                      ...exercise,
+                      sets: exercise.sets.map((set) =>
+                        set.id === setId ? { ...set, completed } : set
+                      ),
+                    }
+                  : exercise
+              ),
+            }
+          : workout
+      )
+    )
+  }
+
+  return {
+    workouts,
+    loading,
+    error,
+    addWorkout,
+    updateWorkout,
+    deleteWorkout,
+    addExercise,
+    updateSetCompletion,
+  }
+}
